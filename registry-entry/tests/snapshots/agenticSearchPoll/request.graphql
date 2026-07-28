@@ -1,0 +1,11 @@
+query MyQuery($jobId: String!) {
+  getAgenticSearchJob(jobId: $jobId) {
+    id
+    status
+    generatedJson {
+      summary
+      structuredData
+    }
+    error
+  }
+}

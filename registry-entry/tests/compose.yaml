@@ -1,0 +1,24 @@
+# Anakin has no public "anakin-mock" image (unlike stripe/stripe-mock, which
+# ndc-stripe's tests/compose.yaml depends on). WireMock is a real,
+# off-the-shelf stub server (https://hub.docker.com/r/wiremock/wiremock) —
+# used here in the same role stripe-mock plays for ndc-stripe: a fixed,
+# healthchecked service the e2e-testing runner starts before connector
+# introspection, returning canned responses for the request shapes in
+# ./wiremock/mappings/*.json.
+#
+# This is provided so the e2e wiring is genuinely runnable, not just
+# described — but it has not been run in this sandbox (no Docker). See
+# ../../SUBMIT.md.
+services:
+  wiremock:
+    image: wiremock/wiremock:3.9.1
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/__admin/mappings"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s

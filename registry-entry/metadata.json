@@ -1,0 +1,21 @@
+{
+  "overview": {
+    "namespace": "anakin",
+    "description": "Query Anakin's web scraping, AI search, and agentic research API from Hasura DDN via GraphQL.",
+    "title": "Anakin Connector",
+    "logo": "logo.png",
+    "tags": ["http", "rest", "web-scraping", "search", "ai"],
+    "latest_version": "v0.1.0"
+  },
+  "author": {
+    "support_email": "support@anakin.io",
+    "homepage": "https://anakin.io",
+    "name": "Anakin"
+  },
+  "is_verified": false,
+  "is_hosted_by_hasura": false,
+  "source_code": {
+    "is_open_source": true,
+    "repository": "https://github.com/anakin-io/ndc-anakin"
+  }
+}

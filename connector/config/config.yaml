@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/hasura/ndc-http/refs/heads/main/ndc-http-schema/jsonschema/configuration.schema.json
+#
+# Runtime config for the ndc-http connector (https://github.com/hasura/ndc-http),
+# read from /etc/connector at container start (see ../Dockerfile).
+#
+# This points ndc-http directly at the hand-written OpenAPI 3.0 document for
+# Anakin's url-scraper / search / agentic-search endpoints and lets the
+# connector's built-in OpenAPI-to-NDC-schema transform run at startup — the
+# same "runtime files: spec: oas3" mode documented at
+# https://github.com/hasura/ndc-http/blob/main/docs/configuration.md.
+#
+# Deliberately NOT pre-converted to a static schema.json via
+# `ndc-http-schema convert` (the pattern used by ndc-stripe/generator/config.yaml)
+# because that CLI needs a Go toolchain unavailable in this sandbox — see
+# SUBMIT.md. Pre-converting is a valid follow-up optimization (faster cold
+# start, decoupled from the OpenAPI file at runtime); it is not required for
+# the connector to function.
+output: schema.output.json
+strict: false
+forwardHeaders:
+  enabled: false
+concurrency:
+  query: 1
+  mutation: 1
+  http: 1
+files:
+  - file: anakin.openapi.json
+    spec: oas3
+    envPrefix: ANAKIN
+    timeout:
+      env: ANAKIN_TIMEOUT
+      value: 30
+    retry:
+      times:
+        env: ANAKIN_RETRY_TIMES
+        value: 1
+      delay:
+        env: ANAKIN_RETRY_DELAY
+        value: 1000
+      httpStatus: [429, 500, 502, 503]

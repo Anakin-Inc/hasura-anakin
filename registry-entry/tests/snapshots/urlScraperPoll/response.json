@@ -1,0 +1,11 @@
+{
+  "data": {
+    "getUrlScraperJob": {
+      "id": "job_scrape_e2e_1",
+      "url": "https://example.com",
+      "status": "completed",
+      "markdown": "# Example Domain\n\nThis domain is for use in illustrative examples.",
+      "error": null
+    }
+  }
+}

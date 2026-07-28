@@ -1,0 +1,12 @@
+query MyQuery($prompt: String!) {
+  search(prompt: $prompt, limit: 5) {
+    id
+    results {
+      url
+      title
+      snippet
+      date
+      lastUpdated
+    }
+  }
+}

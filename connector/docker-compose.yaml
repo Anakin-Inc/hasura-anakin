@@ -1,0 +1,15 @@
+services:
+  ndc-anakin:
+    build:
+      context: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/etc/connector:ro
+    environment:
+      ANAKIN_SERVER_URL: ${ANAKIN_SERVER_URL}
+      ANAKIN_API_KEY: ${ANAKIN_API_KEY}
+      ANAKIN_TIMEOUT: ${ANAKIN_TIMEOUT}
+      ANAKIN_RETRY_TIMES: ${ANAKIN_RETRY_TIMES}
+      ANAKIN_RETRY_DELAY: ${ANAKIN_RETRY_DELAY}
+      HASURA_LOG_LEVEL: debug

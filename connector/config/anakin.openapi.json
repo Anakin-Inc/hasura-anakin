@@ -1,0 +1,320 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Anakin API",
+    "version": "v1",
+    "description": "Web scraping, AI search, and agentic (multi-stage) research API. Subset covering url-scraper, search, and agentic-search — the baseline three endpoints for this connector's first pass. See https://docs.anakin.io for the full surface (map, crawl, wire, sessions)."
+  },
+  "servers": [
+    {
+      "url": "https://api.anakin.io/v1"
+    }
+  ],
+  "security": [
+    {
+      "api_key": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "api_key": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    },
+    "schemas": {
+      "UrlScraperRequest": {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The URL to scrape."
+          },
+          "country": {
+            "type": "string",
+            "description": "Proxy country code.",
+            "default": "us"
+          },
+          "useBrowser": {
+            "type": "boolean",
+            "description": "Render with a headless browser instead of a plain HTTP fetch.",
+            "default": false
+          },
+          "generateJson": {
+            "type": "boolean",
+            "description": "Ask the model to also emit a structured JSON extraction of the page.",
+            "default": false
+          },
+          "forceFresh": {
+            "type": "boolean",
+            "description": "Bypass the response cache and force a fresh scrape.",
+            "default": false
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "Reuse an existing authenticated browser session (see /sessions).",
+            "nullable": true
+          },
+          "sessionName": {
+            "type": "string",
+            "description": "Human-readable name for a new session created for this scrape.",
+            "nullable": true
+          }
+        }
+      },
+      "JobSubmitResponse": {
+        "type": "object",
+        "required": ["jobId"],
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "description": "Job id to poll for the result."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "processing"],
+            "nullable": true
+          }
+        }
+      },
+      "Document": {
+        "type": "object",
+        "required": ["id", "url", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "url": { "type": "string", "format": "uri" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "processing", "completed", "failed"]
+          },
+          "cached": { "type": "boolean", "default": false },
+          "durationMs": { "type": "integer", "default": 0 },
+          "createdAt": { "type": "string", "format": "date-time", "nullable": true },
+          "completedAt": { "type": "string", "format": "date-time", "nullable": true },
+          "markdown": { "type": "string", "nullable": true },
+          "html": { "type": "string", "nullable": true },
+          "cleanedHtml": { "type": "string", "nullable": true },
+          "links": { "type": "array", "items": { "type": "string" }, "nullable": true },
+          "images": { "type": "array", "items": { "type": "string" }, "nullable": true },
+          "summary": { "type": "string", "nullable": true },
+          "generatedJson": { "type": "object", "additionalProperties": true, "nullable": true },
+          "screenshotUrl": { "type": "string", "nullable": true },
+          "fullPageScreenshotUrl": { "type": "string", "nullable": true },
+          "error": { "type": "string", "nullable": true }
+        }
+      },
+      "SearchRequest": {
+        "type": "object",
+        "required": ["prompt"],
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "The search query or question."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of results to return.",
+            "default": 5
+          }
+        }
+      },
+      "SearchResultItem": {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "title": { "type": "string", "nullable": true },
+          "snippet": { "type": "string", "nullable": true },
+          "date": { "type": "string", "nullable": true },
+          "lastUpdated": { "type": "string", "nullable": true }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "required": ["id", "results"],
+        "properties": {
+          "id": { "type": "string" },
+          "results": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/SearchResultItem" }
+          }
+        }
+      },
+      "AgenticSearchRequest": {
+        "type": "object",
+        "required": ["prompt"],
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "The research question or task."
+          },
+          "useBrowser": {
+            "type": "boolean",
+            "description": "Allow the agent to use a headless browser for pages that need it.",
+            "default": true
+          },
+          "schema": {
+            "type": "object",
+            "description": "Optional JSON Schema describing the structured data to extract.",
+            "additionalProperties": true,
+            "nullable": true
+          }
+        }
+      },
+      "AgenticSearchData": {
+        "type": "object",
+        "properties": {
+          "summary": { "type": "string", "nullable": true },
+          "structuredData": { "type": "object", "additionalProperties": true, "nullable": true },
+          "dataSchema": { "type": "object", "additionalProperties": true, "nullable": true }
+        }
+      },
+      "AgenticSearchResult": {
+        "type": "object",
+        "required": ["id", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "processing", "completed", "failed"]
+          },
+          "jobType": { "type": "string", "default": "agentic_search" },
+          "generatedJson": { "$ref": "#/components/schemas/AgenticSearchData" },
+          "cached": { "type": "boolean", "default": false },
+          "createdAt": { "type": "string", "format": "date-time", "nullable": true },
+          "completedAt": { "type": "string", "format": "date-time", "nullable": true },
+          "durationMs": { "type": "integer", "default": 0 },
+          "error": { "type": "string", "nullable": true }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/url-scraper": {
+      "post": {
+        "operationId": "submitUrlScraper",
+        "summary": "Submit a URL to scrape",
+        "description": "Async job — submit here, then poll GET /url-scraper/{jobId} until status is completed or failed.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UrlScraperRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job submitted.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JobSubmitResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/url-scraper/{jobId}": {
+      "get": {
+        "operationId": "getUrlScraperJob",
+        "summary": "Poll a url-scraper job",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current job state. Terminal when status is completed or failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Document" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search": {
+      "post": {
+        "operationId": "search",
+        "summary": "AI-powered web search (synchronous)",
+        "description": "Synchronous — returns directly, no polling. Costs 3 credits per call.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SearchRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SearchResult" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agentic-search": {
+      "post": {
+        "operationId": "submitAgenticSearch",
+        "summary": "Submit a multi-stage agentic research job",
+        "description": "Async job — submit here, then poll GET /agentic-search/{jobId} until status is completed or failed. Costs 10 credits.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AgenticSearchRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job submitted.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JobSubmitResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agentic-search/{jobId}": {
+      "get": {
+        "operationId": "getAgenticSearchJob",
+        "summary": "Poll an agentic-search job",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current job state. Terminal when status is completed or failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AgenticSearchResult" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

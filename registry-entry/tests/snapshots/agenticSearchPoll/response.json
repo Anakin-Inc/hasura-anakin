@@ -1,0 +1,13 @@
+{
+  "data": {
+    "getAgenticSearchJob": {
+      "id": "job_agentic_e2e_1",
+      "status": "completed",
+      "generatedJson": {
+        "summary": "Anakin is a web scraping, search, and agentic research API.",
+        "structuredData": { "company": "Anakin", "product": "API" }
+      },
+      "error": null
+    }
+  }
+}

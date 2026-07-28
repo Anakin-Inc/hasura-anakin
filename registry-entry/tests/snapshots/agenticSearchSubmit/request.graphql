@@ -1,0 +1,6 @@
+mutation MyMutation($prompt: String!) {
+  submitAgenticSearch(prompt: $prompt, useBrowser: true) {
+    jobId
+    status
+  }
+}

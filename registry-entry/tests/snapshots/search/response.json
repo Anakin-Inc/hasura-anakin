@@ -1,0 +1,16 @@
+{
+  "data": {
+    "search": {
+      "id": "search_e2e_1",
+      "results": [
+        {
+          "url": "https://example.com/anakin-api",
+          "title": "Anakin API docs",
+          "snippet": "Web scraping, AI search, and agentic research API.",
+          "date": "2026-01-01",
+          "lastUpdated": "2026-06-01"
+        }
+      ]
+    }
+  }
+}

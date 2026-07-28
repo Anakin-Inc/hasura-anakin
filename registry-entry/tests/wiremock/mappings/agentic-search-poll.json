@@ -1,0 +1,26 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/agentic-search/job_agentic_e2e_1",
+    "headers": { "X-API-Key": { "equalTo": "test-key" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "id": "job_agentic_e2e_1",
+      "status": "completed",
+      "jobType": "agentic_search",
+      "cached": false,
+      "durationMs": 6120,
+      "createdAt": "2026-07-27T00:00:00Z",
+      "completedAt": "2026-07-27T00:00:06Z",
+      "generatedJson": {
+        "summary": "Anakin is a web scraping, search, and agentic research API.",
+        "structuredData": { "company": "Anakin", "product": "API" },
+        "dataSchema": null
+      },
+      "error": null
+    }
+  }
+}

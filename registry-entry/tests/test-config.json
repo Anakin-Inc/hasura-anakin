@@ -1,0 +1,10 @@
+{
+  "hub_id": "anakin/anakin",
+  "port": 8083,
+  "snapshots_dir": "snapshots",
+  "setup_compose_file_path": "compose.yaml",
+  "envs": [
+    "ANAKIN_SERVER_URL=http://wiremock:8080",
+    "ANAKIN_API_KEY=test-key"
+  ]
+}

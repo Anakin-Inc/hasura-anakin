@@ -1,0 +1,9 @@
+query MyQuery($jobId: String!) {
+  getUrlScraperJob(jobId: $jobId) {
+    id
+    url
+    status
+    markdown
+    error
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "version": "v0.1.0",
+  "uri": "TODO://github.com/anakin-io/ndc-anakin/releases/download/v0.1.0/connector-definition.tgz",
+  "checksum": {
+    "type": "sha256",
+    "value": "TODO-sha256-of-the-released-connector-definition.tgz"
+  },
+  "source": {
+    "hash": "TODO-git-commit-hash-of-the-ndc-anakin-repo-at-v0.1.0"
+  },
+  "test": {
+    "test_config_path": "../../tests/test-config.json"
+  }
+}

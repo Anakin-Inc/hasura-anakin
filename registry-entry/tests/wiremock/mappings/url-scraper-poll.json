@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/url-scraper/job_scrape_e2e_1",
+    "headers": { "X-API-Key": { "equalTo": "test-key" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "id": "job_scrape_e2e_1",
+      "url": "https://example.com",
+      "status": "completed",
+      "cached": false,
+      "durationMs": 842,
+      "createdAt": "2026-07-27T00:00:00Z",
+      "completedAt": "2026-07-27T00:00:01Z",
+      "markdown": "# Example Domain\n\nThis domain is for use in illustrative examples.",
+      "error": null
+    }
+  }
+}
