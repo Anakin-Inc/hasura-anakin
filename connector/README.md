@@ -20,8 +20,8 @@ for its own Stripe and SendGrid connectors.
 
 ## Covers
 
-The three endpoints specified as this integration's baseline (matching what
-every other single-purpose Anakin integration built this session covers):
+The full 21-capability Anakin surface — scraping, search, Wire automation,
+website monitoring, AI visibility, sessions, and browser automation:
 
 | Operation | HTTP | NDC kind | Notes |
 |---|---|---|---|
@@ -30,16 +30,43 @@ every other single-purpose Anakin integration built this session covers):
 | `search` | `POST /search` | procedure (mutation)* | synchronous, no polling |
 | `submitAgenticSearch` | `POST /agentic-search` | procedure (mutation) | async — returns `jobId` |
 | `getAgenticSearchJob` | `GET /agentic-search/{jobId}` | function (query) | poll until `status` is `completed`/`failed` |
+| `submitMap` | `POST /map` | procedure (mutation) | async — returns `jobId` |
+| `getMapJob` | `GET /map/{jobId}` | function (query) | poll until `status` is `completed`/`failed` |
+| `submitCrawl` | `POST /crawl` | procedure (mutation) | async — returns `jobId` |
+| `getCrawlJob` | `GET /crawl/{jobId}` | function (query) | poll until `status` is `completed`/`failed` |
+| `wireResolve` | `GET /wire/resolve` | function (query) | synchronous — ranked candidate actions from an intent |
+| `listWireCatalog` | `GET /wire/catalog` | function (query) | every catalog + action count |
+| `getWireCatalog` | `GET /wire/catalog/{slug}` | function (query) | one catalog's full action list + param schemas |
+| `submitWireTask` | `POST /wire/task` | procedure (mutation) | runs both read *and* write Wire actions — sync (data inline) or async (`job_id`) depending on the action |
+| `getWireJob` | `GET /wire/jobs/{jobId}` | function (query) | poll until `status` is `completed`/`failed` |
+| `listWireIdentities` | `GET /wire/identities` | function (query) | saved identities + credentials |
+| `wireLogin` | `POST /wire/login` | procedure (mutation) | credentials-mode sign-in → `credential_id` |
+| `wireBuildRequest` | `POST /wire/build-request` | procedure (mutation) | requests a new action for an uncataloged site; async, starts `pending` |
+| `createMonitor` | `POST /monitors` | procedure (mutation) | recurring, billed, side-effecting |
+| `listMonitors` | `GET /monitors` | function (query) | |
+| `getMonitor` | `GET /monitors/{id}` | function (query) | |
+| `deleteMonitor` | `DELETE /monitors/{id}` | procedure (mutation) | irreversible |
+| `getMonitorChanges` | `GET /monitors/{id}/changes` | function (query) | |
+| `pauseMonitor` / `resumeMonitor` / `runMonitorNow` | `POST /monitors/{id}/{pause,resume,run}` | procedure (mutation) | |
+| `submitAiVisibilitySearch` | `POST /ai-visibility/search` | procedure (mutation) | async — poll by `search_id` |
+| `getAiVisibilitySearch` | `GET /ai-visibility/search/{searchId}` | function (query) | poll until `status` is not `running` |
+| `listAiVisibilitySources` | `GET /ai-visibility/sources` | function (query) | |
+| `listSessions` | `GET /sessions` | function (query) | |
+| `deleteSession` | `DELETE /sessions/{id}` | procedure (mutation) | irreversible |
+| `submitBrowserTask` | `POST /ai/evaluate` | procedure (mutation) | always submitted async (`async: true`) — returns `workflow_id` |
+| `getBrowserTaskJob` | `GET /ai/jobs/{id}` | function (query) | poll until `status` is `completed`/`failed`/`timed_out` |
 
 \* `ndc-http` maps every non-`GET` method to an NDC procedure regardless of
-whether the underlying call has side effects — `search` is read-only but
-still a mutation field in the generated GraphQL schema, same as
-`getAccountsAccount`-style POST lookups in `ndc-stripe`. This is a property
-of the generic connector, not something specific to Anakin.
+whether the underlying call has side effects — `search`, `wireResolve`-style
+GETs aside, several of the above (e.g. `search`, `submitWireTask` for a
+read-type Wire action) are read-only but still land as mutation fields in
+the generated GraphQL schema, same as `getAccountsAccount`-style POST
+lookups in `ndc-stripe`. This is a property of the generic connector, not
+something specific to Anakin.
 
-Map/crawl/wire/sessions and the `formats`/`poll_timeout` SDK conveniences are
-out of scope for this first pass — same scoping call made in the sibling
-Fivetran and Dagster submissions in this directory.
+The `formats` / `poll_timeout` SDK conveniences (client-side response
+shaping, not distinct HTTP endpoints) remain out of scope — there is no
+separate wire format for them to expose.
 
 ## Async jobs are not polled by the connector
 
