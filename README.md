@@ -47,13 +47,41 @@ namespace being merged.
 
 ## Covers
 
-Same three-endpoint baseline as every other single-purpose Anakin
-integration built this session:
+The full 21-capability Anakin surface — all 30 paths / 32 operations across
+scraping, search, Wire automation, monitoring, AI visibility, sessions, and
+browser automation:
 
 - `POST /url-scraper` (submit) + `GET /url-scraper/:jobId` (poll)
 - `POST /search` — synchronous, no polling
 - `POST /agentic-search` (submit) + `GET /agentic-search/:jobId` (poll)
+- `POST /map` (submit) + `GET /map/:jobId` (poll)
+- `POST /crawl` (submit) + `GET /crawl/:jobId` (poll)
+- `GET /wire/resolve` — synchronous action discovery from a natural-language intent
+- `GET /wire/catalog` and `GET /wire/catalog/:slug` — browse the Wire catalog
+- `POST /wire/task` (submit — sync or async) + `GET /wire/jobs/:jobId` (poll) —
+  the single endpoint backing both read and write Wire actions
+- `GET /wire/identities` — saved identities/credentials
+- `POST /wire/login` — credentials-mode sign-in
+- `POST /wire/build-request` — request a new Wire action for an uncataloged site
+- `POST /monitors` (create), `GET /monitors` (list), `GET /monitors/:id` (get),
+  `DELETE /monitors/:id` (delete), `GET /monitors/:id/changes`,
+  `POST /monitors/:id/{pause,resume,run}`
+- `POST /ai-visibility/search` (submit) + `GET /ai-visibility/search/:searchId` (poll)
+- `GET /ai-visibility/sources`
+- `GET /sessions` + `DELETE /sessions/:id`
+- `POST /ai/evaluate` (submit, async) + `GET /ai/jobs/:id` (poll)
 
-Ground truth read directly from `anakin-py/src/anakin/client.py` and
-`anakin-py/src/anakin/models.py` — base URL `https://api.anakin.io/v1`, auth
-via `X-API-Key` header.
+Ground truth for the original three endpoints (`url-scraper`, `search`,
+`agentic-search`) was read directly from `anakin-py/src/anakin/client.py` and
+`anakin-py/src/anakin/models.py`. Ground truth for the 18 endpoints added
+afterward was read directly from `anakin-mcp/src/client.ts` and
+`anakin-mcp/src/tools/*.ts` — the TypeScript MCP server's own HTTP client and
+per-tool parameter schemas, which mirror the same production API
+(`https://api.anakin.io/v1`, `X-API-Key` header auth). Several response
+shapes there are only as concrete as the ground truth itself: `client.ts`
+types a number of Wire/monitor/session/AI-visibility responses as `unknown`
+or `Record<string, unknown>`, so the corresponding OpenAPI schemas
+(`WireCatalogResponse`, `MonitorResponse`, `SessionsListResponse`, etc.) are
+deliberately permissive (`additionalProperties: true`, no fabricated
+required fields) rather than guessing field names the ground truth doesn't
+confirm.

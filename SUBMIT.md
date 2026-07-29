@@ -72,10 +72,14 @@ step** — not filing a cold PR and hoping it's merged.
 connector/          The connector itself — config-driven, built on ndc-http.
   Dockerfile           FROM ghcr.io/hasura/ndc-http:v0.14.1 + COPY config
   config/
-    anakin.openapi.json   Hand-written OpenAPI 3.0.3 spec, 3 endpoints /
-                           5 operations, from ground truth (client.py,
-                           models.py) — not fetched from a live Anakin
-                           OpenAPI doc, because Anakin doesn't yet publish one.
+    anakin.openapi.json   Hand-written OpenAPI 3.0.3 spec, 30 paths /
+                           32 operations covering all 21 Anakin
+                           capabilities, from ground truth (client.py,
+                           models.py for the original url-scraper/search/
+                           agentic-search trio; anakin-mcp/src/client.ts +
+                           tools/*.ts for the 18 added afterward) — not
+                           fetched from a live Anakin OpenAPI doc, because
+                           Anakin doesn't yet publish one.
     config.yaml            ndc-http runtime config: envPrefix ANAKIN,
                             X-API-Key auth, timeout/retry.
   docker-compose.yaml, .env.example, README.md
@@ -118,11 +122,25 @@ PNG dropped in before filing.
   `ndc-http`'s docs describe: `servers`, `security` +
   `components.securitySchemes.api_key` (`type: apiKey`, `in: header`,
   `name: X-API-Key`), every path has `operationId` + `responses.200.content`.
-- Every field name in the OpenAPI request/response schemas
-  (`url`, `country`, `useBrowser`, `generateJson`, `forceFresh`, `sessionId`,
-  `sessionName`, `prompt`, `limit`, `schema`, and the full `Document` /
-  `SearchResult` / `AgenticSearchResult` response shapes) is copied from
-  `anakin-py/src/anakin/client.py` and `models.py`, not invented.
+- Every field name in the OpenAPI request/response schemas for the original
+  three endpoints (`url`, `country`, `useBrowser`, `generateJson`,
+  `forceFresh`, `sessionId`, `sessionName`, `prompt`, `limit`, `schema`, and
+  the full `Document` / `SearchResult` / `AgenticSearchResult` response
+  shapes) is copied from `anakin-py/src/anakin/client.py` and `models.py`,
+  not invented.
+- The 18 endpoints added afterward (`map`, `crawl`, all seven Wire
+  operations, all six monitor operations, both AI-visibility operations,
+  both session operations, and browser-task) — every request field, default,
+  and concrete response shape (`MapResult`, `CrawlResult`/`CrawlPage`,
+  `WireJobStatus`/`WireJobError`, `AIVisibilitySearchResult`,
+  `BrowserTaskJob`/`BrowserTaskResult`, etc.) is copied from
+  `anakin-mcp/src/client.ts` and `anakin-mcp/src/tools/*.ts`. Where that
+  ground truth itself types a response as `unknown` or
+  `Record<string, unknown>` (most of Wire's catalog/identities/login/build
+  responses, monitor responses, session list/delete, AI-visibility sources),
+  the OpenAPI schema is deliberately a permissive
+  `{"type":"object","additionalProperties":true}` with a description flagging
+  the gap, rather than inventing field names no ground truth confirms.
 - `config/config.yaml`'s shape (`output`, `strict`, `forwardHeaders`,
   `concurrency`, `files[].{file,spec,envPrefix,timeout,retry}`) matches
   `ndc-stripe/config/config.yaml` and `ndc-http/docs/configuration.md`
@@ -157,6 +175,14 @@ PNG dropped in before filing.
 - **No live Anakin API key was used anywhere** — every response fixture is
   a hand-built canned value shaped like the real SDK models, not a captured
   real response.
+- **`registry-entry/tests/` (WireMock mappings + GraphQL snapshots) still
+  only covers the original 5 operations** (`search`, `submitUrlScraper` /
+  `getUrlScraperJob`, `submitAgenticSearch` / `getAgenticSearchJob`). Adding
+  the other 27 operations' mappings and per-operation
+  `request.graphql`/`variables.json`/`response.json` snapshots — 24 more
+  WireMock stubs plus matching fixtures — is real, sizeable follow-up work
+  not attempted here; this pass extended `anakin.openapi.json` and its
+  documentation only, not the e2e test fixtures.
 
 ## Steps (needs the account owner)
 
@@ -205,11 +231,26 @@ JSON validated with `json.load` — every JSON file in the directory:
 `registry-entry/tests/snapshots/*/{response,variables}.json` — all clean.
 
 `anakin.openapi.json` additionally checked with a small script: every
-`$ref` resolves to a real schema under `components.schemas` (10/10
-resolved), `openapi` is a 3.0.x version, `servers[0].url` is
+`$ref` resolves to a real schema under `components.schemas` (49/49
+resolved across 39 defined schemas, all 39 referenced at least once —
+no orphans), `openapi` is a 3.0.x version, `servers[0].url` is
 `https://api.anakin.io/v1`, `securitySchemes.api_key` matches the
-documented `apiKey`/`header`/`X-API-Key` shape, and all 5 expected
-operations exist with an `operationId` and a `200` response.
+documented `apiKey`/`header`/`X-API-Key` shape, all 32 operations across
+30 paths exist with an `operationId` and a `200` response, and there are
+no duplicate `operationId`s. Then re-checked with the real
+`openapi-spec-validator` package (0.7.2) against the full OpenAPI 3.0
+meta-schema — `validate(spec)` raises nothing, i.e. structurally valid,
+not just internally self-consistent:
+
+```
+$ python3 -c "
+from openapi_spec_validator import validate
+import json
+validate(json.load(open('connector/config/anakin.openapi.json')))
+print('VALID')
+"
+VALID
+```
 
 (GraphQL `request.graphql` files are not machine-validated — no GraphQL
 parser available in this sandbox; checked by eye against the field names in

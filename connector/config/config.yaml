@@ -3,10 +3,12 @@
 # Runtime config for the ndc-http connector (https://github.com/hasura/ndc-http),
 # read from /etc/connector at container start (see ../Dockerfile).
 #
-# This points ndc-http directly at the hand-written OpenAPI 3.0 document for
-# Anakin's url-scraper / search / agentic-search endpoints and lets the
-# connector's built-in OpenAPI-to-NDC-schema transform run at startup — the
-# same "runtime files: spec: oas3" mode documented at
+# This points ndc-http directly at the hand-written OpenAPI 3.0 document
+# covering Anakin's full API surface (scraping, search, Wire automation,
+# monitoring, AI visibility, sessions, browser automation — 30 paths / 32
+# operations) and lets the connector's built-in OpenAPI-to-NDC-schema
+# transform run at startup — the same "runtime files: spec: oas3" mode
+# documented at
 # https://github.com/hasura/ndc-http/blob/main/docs/configuration.md.
 #
 # Deliberately NOT pre-converted to a static schema.json via

@@ -3,7 +3,7 @@
   "info": {
     "title": "Anakin API",
     "version": "v1",
-    "description": "Web scraping, AI search, and agentic (multi-stage) research API. Subset covering url-scraper, search, and agentic-search — the baseline three endpoints for this connector's first pass. See https://docs.anakin.io for the full surface (map, crawl, wire, sessions)."
+    "description": "Web scraping (url-scraper, map, crawl), AI search (search, agentic-search), the Wire pre-built-automation catalog (resolve, catalog, task execution, identities, login, build-request), website change monitoring, AI-visibility (multi-engine answer comparison), saved browser sessions, and AI browser automation. Full 21-operation surface consumed by anakin-mcp (see https://github.com/anakin-io/anakin-mcp/blob/main/src/client.ts), the ground truth this document is generated from. See https://docs.anakin.io for authoritative API docs."
   },
   "servers": [
     {
@@ -189,6 +189,450 @@
           "durationMs": { "type": "integer", "default": 0 },
           "error": { "type": "string", "nullable": true }
         }
+      },
+      "MapRequest": {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The starting URL for discovery (typically a homepage or section root)."
+          },
+          "limit": { "type": "integer", "description": "Maximum number of URLs to return overall.", "default": 100 },
+          "depth": { "type": "integer", "description": "How many link-hops from the starting URL to follow.", "default": 2 },
+          "limitPerLevel": { "type": "integer", "description": "Maximum URLs collected per depth level (controls breadth).", "default": 100 },
+          "includeSubdomains": { "type": "boolean", "description": "Include URLs on subdomains of the starting host.", "default": false },
+          "includeExternalLinks": { "type": "boolean", "description": "Also collect (but do not follow) external links.", "default": false },
+          "useBrowser": { "type": "boolean", "description": "Render with a headless browser (for SPAs).", "default": false },
+          "search": { "type": "string", "description": "Optional keyword filter — only return URLs whose path/title matches.", "nullable": true }
+        }
+      },
+      "MapResult": {
+        "type": "object",
+        "required": ["id", "url", "links", "totalLinks", "externalLinks", "totalExternalLinks", "durationMs"],
+        "properties": {
+          "id": { "type": "string" },
+          "url": { "type": "string", "format": "uri" },
+          "links": { "type": "array", "items": { "type": "string" } },
+          "totalLinks": { "type": "integer" },
+          "externalLinks": { "type": "array", "items": { "type": "string" } },
+          "totalExternalLinks": { "type": "integer" },
+          "durationMs": { "type": "integer" },
+          "status": { "type": "string", "enum": ["completed", "failed"], "nullable": true },
+          "error": { "type": "string", "nullable": true }
+        }
+      },
+      "CrawlRequest": {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "url": { "type": "string", "format": "uri", "description": "Starting URL." },
+          "maxPages": { "type": "integer", "description": "Hard cap on pages fetched.", "default": 10 },
+          "depth": { "type": "integer", "description": "Link-hops from the starting URL to follow.", "default": 1 },
+          "country": { "type": "string", "description": "Two-letter proxy egress country code.", "default": "us" },
+          "useBrowser": { "type": "boolean", "description": "Render each page in a headless browser (for SPAs).", "default": false },
+          "includePatterns": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Glob/regex patterns. Only URLs matching at least one pattern are fetched.",
+            "nullable": true
+          },
+          "excludePatterns": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Glob/regex patterns. URLs matching any pattern are skipped.",
+            "nullable": true
+          },
+          "sessionId": { "type": "string", "description": "Reuse an existing authenticated browser session (see /sessions).", "nullable": true },
+          "sessionName": { "type": "string", "description": "Human-readable name for a new session created for this crawl.", "nullable": true }
+        }
+      },
+      "CrawlPage": {
+        "type": "object",
+        "required": ["url", "status", "durationMs"],
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "status": { "type": "string", "enum": ["completed", "failed"] },
+          "markdown": { "type": "string", "nullable": true },
+          "html": { "type": "string", "nullable": true },
+          "durationMs": { "type": "integer" },
+          "error": { "type": "string", "nullable": true }
+        }
+      },
+      "CrawlResult": {
+        "type": "object",
+        "required": ["id", "url", "totalPages", "completedPages", "pages", "durationMs"],
+        "properties": {
+          "id": { "type": "string" },
+          "url": { "type": "string", "format": "uri" },
+          "totalPages": { "type": "integer" },
+          "completedPages": { "type": "integer" },
+          "pages": { "type": "array", "items": { "$ref": "#/components/schemas/CrawlPage" } },
+          "durationMs": { "type": "integer" },
+          "status": { "type": "string", "enum": ["completed", "failed"], "nullable": true },
+          "error": { "type": "string", "nullable": true }
+        }
+      },
+      "WireResolveResponse": {
+        "type": "object",
+        "description": "Ranked candidate Wire actions for a natural-language intent.",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": { "type": "object", "additionalProperties": true },
+            "description": "Each item carries at least action_id, type (read/write), a params schema, credit cost, and auth_mode.",
+            "nullable": true
+          },
+          "next": { "type": "string", "description": "Suggested next call.", "nullable": true }
+        }
+      },
+      "WireCatalogResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "With no slug: every supported website and its action count. With a slug: that site's full action list, parameter schemas, auth modes, and credit costs. Shape not fully typed in ground truth (client.ts returns `unknown`); represented permissively."
+      },
+      "WireTaskRequest": {
+        "type": "object",
+        "required": ["action_id"],
+        "properties": {
+          "action_id": { "type": "string", "description": "The Wire action to run (from GET /wire/resolve or /wire/catalog)." },
+          "params": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The action's input parameters. Shape depends on the action. Omitted for actions that take none.",
+            "nullable": true
+          },
+          "credential_id": {
+            "type": "string",
+            "description": "Required when the action's auth_mode is \"required\"; honored when \"optional\".",
+            "nullable": true
+          },
+          "identity_id": {
+            "type": "string",
+            "description": "Optional identity selector — the server resolves a credential from it (alternative to credential_id).",
+            "nullable": true
+          }
+        }
+      },
+      "WireTaskResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Either an accepted-job envelope (status/job_id/poll_url — poll GET /wire/jobs/{job_id}) or, for sync actions, the terminal result inline (data/credits_used/execution_ms) with no job_id.",
+        "properties": {
+          "status": { "type": "string", "nullable": true },
+          "job_id": { "type": "string", "description": "Present when the task runs asynchronously — poll GET /wire/jobs/{jobId}.", "nullable": true },
+          "poll_url": { "type": "string", "nullable": true },
+          "data": { "type": "object", "additionalProperties": true, "description": "Present when the action completed synchronously inline.", "nullable": true },
+          "credits_used": { "type": "integer", "nullable": true },
+          "execution_ms": { "type": "integer", "nullable": true },
+          "error": { "$ref": "#/components/schemas/WireJobError" }
+        }
+      },
+      "WireJobError": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "code": { "type": "string", "nullable": true },
+          "message": { "type": "string", "nullable": true },
+          "details": { "type": "string", "nullable": true },
+          "connect_url": { "type": "string", "description": "Present on AUTH_REQUIRED — where to connect the account.", "nullable": true }
+        }
+      },
+      "WireJobStatus": {
+        "type": "object",
+        "required": ["status"],
+        "additionalProperties": true,
+        "properties": {
+          "status": { "type": "string", "enum": ["processing", "completed", "failed"] },
+          "retry_after_ms": { "type": "integer", "description": "Present while processing — the server's suggested poll delay.", "nullable": true },
+          "data": { "type": "object", "additionalProperties": true, "description": "Present when completed — the action's extracted/returned data.", "nullable": true },
+          "credits_used": { "type": "integer", "nullable": true },
+          "execution_ms": { "type": "integer", "nullable": true },
+          "error": { "$ref": "#/components/schemas/WireJobError" }
+        }
+      },
+      "WireIdentitiesResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Saved identities and their credentials (id, catalog, status). Shape not fully typed in ground truth (client.ts returns `unknown`); represented permissively."
+      },
+      "WireLoginRequest": {
+        "type": "object",
+        "required": ["catalog_slug"],
+        "properties": {
+          "catalog_slug": { "type": "string", "description": "The catalog to sign in to (e.g. \"neb\")." },
+          "identity_name": {
+            "type": "string",
+            "description": "Optional name for the identity. Derived from params in password mode; required when using a 1Password locator.",
+            "nullable": true
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Login fields defined by the catalog (e.g. { email, password }).",
+            "nullable": true
+          },
+          "source_id": { "type": "string", "description": "Optional 1Password identity-source ID (alternative to params).", "nullable": true },
+          "source_ref": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Optional 1Password item locator { vault_id, item_id, fields } (use with source_id instead of params).",
+            "nullable": true
+          }
+        }
+      },
+      "WireLoginResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "A credential_id usable immediately with POST /wire/task. Shape not fully typed in ground truth (client.ts returns `unknown`); represented permissively."
+      },
+      "WireBuildRequest": {
+        "type": "object",
+        "required": ["website_url", "goal"],
+        "properties": {
+          "website_url": { "type": "string", "description": "The site to build an action for. The domain is extracted automatically." },
+          "goal": { "type": "string", "description": "Natural-language description of what the action should do or extract." },
+          "catalog_id": { "type": "string", "description": "Optional — attach to an existing catalog instead of creating one.", "nullable": true },
+          "visibility": { "type": "string", "enum": ["private", "public"], "description": "Action visibility.", "default": "private" },
+          "force": {
+            "type": "boolean",
+            "description": "Build even if similar actions already exist for the domain (otherwise the request is rejected with ACTION_EXISTS).",
+            "default": false
+          }
+        }
+      },
+      "WireBuildResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Async build status (starts \"pending\"). Shape not fully typed in ground truth (client.ts returns `unknown`); represented permissively."
+      },
+      "MonitorCreateRequest": {
+        "type": "object",
+        "required": ["url", "intervalMinutes"],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to watch (root URL for site scope; the Wire site's URL for wire scope)."
+          },
+          "intervalMinutes": { "type": "integer", "description": "Check frequency in minutes. Minimum 15.", "minimum": 15 },
+          "scope": {
+            "type": "string",
+            "enum": ["page", "site", "wire"],
+            "description": "What to monitor: one page (default), a whole site, or a Wire action.",
+            "default": "page"
+          },
+          "watchMode": {
+            "type": "string",
+            "enum": ["full_page", "specific_data"],
+            "description": "Compare the whole page (default) or only the fields in outputSchema, extracted with AI.",
+            "default": "full_page"
+          },
+          "watchFormat": {
+            "type": "string",
+            "enum": ["markdown", "html", "cleaned_html"],
+            "description": "Format compared in full_page mode.",
+            "default": "markdown"
+          },
+          "outputSchema": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "JSON Schema of the fields to track. Required when watchMode is \"specific_data\".",
+            "nullable": true
+          },
+          "aiMode": {
+            "type": "boolean",
+            "description": "AI meaningful-change filtering: ignores trivial noise and summarizes real changes. +1 credit per check.",
+            "default": false
+          },
+          "aiGoal": {
+            "type": "string",
+            "description": "Natural-language description of which changes count as meaningful (used with aiMode).",
+            "nullable": true
+          },
+          "useBrowser": {
+            "type": "boolean",
+            "description": "Render checks with a stealth headless browser. Forced true when sessionId is set.",
+            "default": false
+          },
+          "country": { "type": "string", "description": "Two-letter proxy country code.", "default": "us" },
+          "sessionId": { "type": "string", "description": "Saved browser-session ID for monitoring login-protected pages.", "nullable": true },
+          "isActive": { "type": "boolean", "description": "Start running immediately.", "default": true },
+          "expiresAt": {
+            "type": "string",
+            "description": "Optional end date (ISO 8601 timestamp or YYYY-MM-DD); the monitor auto-pauses when it passes.",
+            "nullable": true
+          },
+          "alertWebhookUrl": { "type": "string", "description": "Webhook URL that receives signed change alerts.", "nullable": true },
+          "alertEmails": { "type": "string", "description": "Comma-separated email recipients for change alerts.", "nullable": true },
+          "maxPages": { "type": "integer", "description": "Site scope: max pages crawled per run.", "nullable": true },
+          "maxDepth": {
+            "type": "integer",
+            "description": "Site scope: crawl depth (1-5). Defaults to 2.",
+            "minimum": 1,
+            "maximum": 5,
+            "nullable": true
+          },
+          "includePatterns": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Site scope: glob patterns or hand-picked same-site URLs to track.",
+            "nullable": true
+          },
+          "excludePatterns": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Site scope: glob patterns to skip.",
+            "nullable": true
+          },
+          "wireActionId": {
+            "type": "string",
+            "description": "Wire scope (required there): the Wire action run each check, e.g. \"amazon.search_products\".",
+            "nullable": true
+          },
+          "wireCatalogSlug": { "type": "string", "description": "Wire scope: catalogue slug of the Wire site.", "nullable": true },
+          "wireCredentialId": { "type": "string", "description": "Wire scope: credential ID when the action needs auth.", "nullable": true },
+          "wireParams": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Wire scope: parameters passed to the action each check.",
+            "nullable": true
+          },
+          "wireWatchPaths": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Wire scope: JSON paths to diff instead of the whole response.",
+            "nullable": true
+          }
+        }
+      },
+      "MonitorResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "A monitor's configuration and status (id, schedule, active state, alert settings). Includes alertWebhookSecret (an HMAC signing secret) on creation. Shape not fully typed in ground truth (client.ts returns Record<string, unknown>); represented permissively."
+      },
+      "MonitorListResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The caller's monitors. Shape not fully typed in ground truth (client.ts returns `unknown`); represented permissively."
+      },
+      "MonitorChangesResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Detected changes for a monitor, each with when the watched content differed and a diff/summary. Shape not fully typed in ground truth (client.ts returns `unknown`); represented permissively."
+      },
+      "MonitorControlResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Result of pausing/resuming/running/deleting a monitor. Shape not fully typed in ground truth (client.ts returns `unknown`); represented permissively."
+      },
+      "AIVisibilitySearchRequest": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": { "type": "string", "description": "The question to ask every engine.", "maxLength": 2000 },
+          "sources": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Engine slugs to query (see GET /ai-visibility/sources). Omit to query all enabled engines.",
+            "nullable": true
+          },
+          "country": { "type": "string", "description": "Two-letter ISO country for the search geography (proxy exit).", "default": "us" }
+        }
+      },
+      "AIVisibilitySearchResult": {
+        "type": "object",
+        "required": ["search_id", "status", "results"],
+        "properties": {
+          "search_id": { "type": "string" },
+          "status": {
+            "type": "string",
+            "description": "\"running\" while in progress; terminal states include \"completed\" and \"failed\" (open-ended — other values are possible)."
+          },
+          "results": {
+            "type": "array",
+            "items": { "type": "object", "additionalProperties": true },
+            "description": "One entry per engine: status, answer summary, latency, credits used, consensus/outlier verdict, and full_content when requested."
+          },
+          "synthesis": { "type": "string", "description": "AI-generated synthesis of where the engines agree and diverge.", "nullable": true },
+          "country": { "type": "string", "nullable": true }
+        }
+      },
+      "AIVisibilitySourcesResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Available AI answer engines, each with a slug and display label. Shape not fully typed in ground truth (client.ts returns `unknown`); represented permissively."
+      },
+      "SessionsListResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Saved browser sessions (encrypted login states), each with an id usable as sessionId elsewhere. Shape not fully typed in ground truth (client.ts returns `unknown`); represented permissively."
+      },
+      "SessionDeleteResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Confirmation of session deletion. Shape not fully typed in ground truth (client.ts returns `unknown`); represented permissively."
+      },
+      "BrowserTaskRequest": {
+        "type": "object",
+        "required": ["prompt"],
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "The task in natural language. Never include passwords or secrets — use session_id for authenticated sites."
+          },
+          "async": {
+            "type": "boolean",
+            "description": "Run asynchronously (202 + workflow_id, poll GET /ai/jobs/{id}) instead of blocking. Always sent true — the synchronous variant can block for up to ~5.5 minutes, far past a typical request timeout.",
+            "default": true
+          },
+          "url": { "type": "string", "description": "Navigate here before starting. Omit to let the agent follow URLs named in the prompt.", "nullable": true },
+          "session_id": { "type": "string", "description": "Saved browser-session ID so the task runs logged in.", "nullable": true },
+          "max_steps": { "type": "integer", "description": "Cap on agent steps (navigation/click/type actions).", "nullable": true },
+          "timeout_ms": { "type": "integer", "description": "Task timeout in milliseconds (server caps runs at ~330s regardless).", "nullable": true },
+          "output_schema": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "JSON Schema for the result — the agent returns structured data conforming to it.",
+            "nullable": true
+          }
+        }
+      },
+      "BrowserTaskSubmitResponse": {
+        "type": "object",
+        "properties": {
+          "workflow_id": { "type": "string", "description": "Present in async mode — poll GET /ai/jobs/{workflow_id}.", "nullable": true },
+          "status": { "type": "string", "nullable": true }
+        }
+      },
+      "BrowserTaskResult": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "success": { "type": "boolean", "nullable": true },
+          "result": { "description": "The task's output — structured JSON when output_schema was supplied." },
+          "steps": { "type": "array", "items": { "type": "object", "additionalProperties": true }, "nullable": true },
+          "iterations": { "type": "integer", "nullable": true },
+          "cached": { "type": "boolean", "nullable": true },
+          "run_id": { "type": "string", "nullable": true },
+          "duration_ms": { "type": "integer", "nullable": true }
+        }
+      },
+      "BrowserTaskJob": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "workflow_id": { "type": "string", "nullable": true },
+          "status": {
+            "type": "string",
+            "enum": ["running", "completed", "failed", "timed_out"],
+            "description": "Open-ended — other values are possible.",
+            "nullable": true
+          },
+          "run_id": { "type": "string", "nullable": true },
+          "result": { "$ref": "#/components/schemas/BrowserTaskResult" },
+          "error": { "type": "string", "nullable": true }
+        }
       }
     }
   },
@@ -310,6 +754,659 @@
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/AgenticSearchResult" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/map": {
+      "post": {
+        "operationId": "submitMap",
+        "summary": "Submit a site-mapping job",
+        "description": "Async job — submit here, then poll GET /map/{jobId} until status is completed or failed. Discovers reachable URLs under a site (internal + external links) without fetching page content.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MapRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job submitted.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JobSubmitResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/map/{jobId}": {
+      "get": {
+        "operationId": "getMapJob",
+        "summary": "Poll a map job",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current job state. Terminal when status is completed or failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MapResult" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/crawl": {
+      "post": {
+        "operationId": "submitCrawl",
+        "summary": "Submit a bulk site crawl",
+        "description": "Async job — submit here, then poll GET /crawl/{jobId} until status is completed or failed. Bulk-fetches markdown/HTML across a site, scoped by maxPages/depth/includePatterns/excludePatterns.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CrawlRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job submitted.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JobSubmitResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/crawl/{jobId}": {
+      "get": {
+        "operationId": "getCrawlJob",
+        "summary": "Poll a crawl job",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current job state. Terminal when status is completed or failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CrawlResult" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wire/resolve": {
+      "get": {
+        "operationId": "wireResolve",
+        "summary": "Find Wire actions for a natural-language intent",
+        "description": "Synchronous — returns ranked candidate actions directly, no polling. Wire is a catalog of pre-built automation actions across hundreds of websites; each result carries its action_id, type (read/write), parameter schema, credit cost, and auth requirement. Run a returned action with POST /wire/task.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "The intent in natural language, e.g. \"top phones on walmart\".",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of candidate actions to return.",
+            "schema": { "type": "integer", "default": 5 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ranked candidate actions.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WireResolveResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wire/catalog": {
+      "get": {
+        "operationId": "listWireCatalog",
+        "summary": "List every Wire catalog",
+        "description": "Synchronous. Every supported website and its action count.",
+        "responses": {
+          "200": {
+            "description": "All catalogs.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WireCatalogResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wire/catalog/{slug}": {
+      "get": {
+        "operationId": "getWireCatalog",
+        "summary": "Get one Wire catalog's full action list",
+        "description": "Synchronous. That site's full action list with exact parameter schemas, each action's type (read/write), auth mode, and credit cost, plus login fields for credentials-mode sites.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "Catalog slug to inspect (e.g. \"walmart\").",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The catalog's detail.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WireCatalogResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wire/task": {
+      "post": {
+        "operationId": "submitWireTask",
+        "summary": "Run a Wire action (read or write)",
+        "description": "Submits a Wire action by action_id (from GET /wire/resolve or /wire/catalog). Most actions run async — the response carries a job_id to poll at GET /wire/jobs/{jobId}; some actions complete synchronously and return their data inline instead. Covers both read actions (data extraction, read-only) and write actions (state-changing interactions on the target site) — the action's own `type` (read/write), not this endpoint, determines which. Pass credential_id or identity_id when the action's auth_mode is required.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WireTaskRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task accepted (async — poll GET /wire/jobs/{job_id}) or completed synchronously with data inline.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WireTaskResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wire/jobs/{jobId}": {
+      "get": {
+        "operationId": "getWireJob",
+        "summary": "Poll a Wire task job",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current job state. Terminal when status is completed or failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WireJobStatus" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wire/identities": {
+      "get": {
+        "operationId": "listWireIdentities",
+        "summary": "List saved Wire identities and credentials",
+        "description": "Synchronous. An identity is a named account on a site; each credential's id is the credential_id passed to POST /wire/task for actions whose auth_mode is required.",
+        "parameters": [
+          {
+            "name": "catalog_id",
+            "in": "query",
+            "required": false,
+            "description": "Restrict to identities for a single catalog.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved identities and credentials.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WireIdentitiesResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wire/login": {
+      "post": {
+        "operationId": "wireLogin",
+        "summary": "Sign in to a credentials-mode Wire site",
+        "description": "Synchronous. Returns a credential_id usable immediately with POST /wire/task. The password is never stored, only the encrypted session. Only for catalogs that support password sign-in; cookie-based sites use the dashboard connect flow instead.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WireLoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WireLoginResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wire/build-request": {
+      "post": {
+        "operationId": "wireBuildRequest",
+        "summary": "Request a brand-new Wire action for an uncataloged site",
+        "description": "Asynchronous (returns status \"pending\") and charges credits, refunded automatically if the build fails. Only use after GET /wire/resolve / /wire/catalog confirm no existing action covers the site.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WireBuildRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Build request accepted.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/WireBuildResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors": {
+      "post": {
+        "operationId": "createMonitor",
+        "summary": "Create a scheduled website monitor",
+        "description": "Checks a URL every intervalMinutes (min 15) and records a change when the content differs — optionally alerting a webhook or email. scope \"page\" (default) watches one URL; \"site\" crawls the site each run; \"wire\" runs a Wire action each check and diffs its JSON.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MonitorCreateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Monitor created.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MonitorResponse" }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listMonitors",
+        "summary": "List website monitors",
+        "description": "The caller's monitors.",
+        "responses": {
+          "200": {
+            "description": "The caller's monitors.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MonitorListResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/{id}": {
+      "get": {
+        "operationId": "getMonitor",
+        "summary": "Get one website monitor",
+        "description": "Full configuration and status: next/last check time, active state, per-check credit cost, alert settings.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The monitor.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MonitorResponse" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteMonitor",
+        "summary": "Delete a website monitor",
+        "description": "Permanently removes the monitor and its history.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monitor deleted.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MonitorControlResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/{id}/changes": {
+      "get": {
+        "operationId": "getMonitorChanges",
+        "summary": "Get a monitor's detected changes",
+        "description": "Each entry records when the watched content differed from the previous check, with a diff/summary (and the AI change summary when aiMode is on).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detected changes.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MonitorChangesResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/{id}/pause": {
+      "post": {
+        "operationId": "pauseMonitor",
+        "summary": "Pause a website monitor",
+        "description": "Stops scheduled checks.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monitor paused.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MonitorControlResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/{id}/resume": {
+      "post": {
+        "operationId": "resumeMonitor",
+        "summary": "Resume a website monitor",
+        "description": "Restarts scheduled checks. May hit the plan's active-monitor cap.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monitor resumed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MonitorControlResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitors/{id}/run": {
+      "post": {
+        "operationId": "runMonitorNow",
+        "summary": "Trigger an immediate monitor check",
+        "description": "Runs an out-of-schedule check now, billed like a normal check.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Check triggered.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MonitorControlResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-visibility/search": {
+      "post": {
+        "operationId": "submitAiVisibilitySearch",
+        "summary": "Ask multiple AI answer engines the same question",
+        "description": "Async job — submit here, then poll GET /ai-visibility/search/{searchId} until status is no longer \"running\". Fans one query out to multiple AI engines (ChatGPT, Gemini, Google AI Overview) and returns one result per engine plus a synthesis. Billed per source; failed sources are free.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AIVisibilitySearchRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search submitted (or already resolved for very fast runs).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AIVisibilitySearchResult" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-visibility/search/{searchId}": {
+      "get": {
+        "operationId": "getAiVisibilitySearch",
+        "summary": "Poll an AI-visibility search",
+        "parameters": [
+          {
+            "name": "searchId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current search state. Terminal when status is not \"running\".",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AIVisibilitySearchResult" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-visibility/sources": {
+      "get": {
+        "operationId": "listAiVisibilitySources",
+        "summary": "List available AI answer engines",
+        "description": "Each engine's slug (what to pass as `sources`) and display label.",
+        "responses": {
+          "200": {
+            "description": "Available engines.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AIVisibilitySourcesResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions": {
+      "get": {
+        "operationId": "listSessions",
+        "summary": "List saved browser sessions",
+        "description": "Encrypted login states captured via the Anakin dashboard or Browser API. Each session's id is usable as sessionId in scrape/crawl/map, monitor create, and browser_task.",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "query",
+            "required": false,
+            "description": "Filter to sessions for one website domain, e.g. \"amazon.com\".",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved sessions.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SessionsListResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{id}": {
+      "delete": {
+        "operationId": "deleteSession",
+        "summary": "Delete a saved browser session",
+        "description": "Permanently deletes the session and its encrypted login data. Irreversible.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session deleted.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SessionDeleteResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/evaluate": {
+      "post": {
+        "operationId": "submitBrowserTask",
+        "summary": "Run a natural-language AI browser task",
+        "description": "Submitted in async mode (async: true → 202 + workflow_id); poll GET /ai/jobs/{workflow_id}. Drives a real stealth browser (navigate, click, type, extract) to complete the task, optionally returning structured JSON per output_schema. Server hard-caps a run at ~330s.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BrowserTaskRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task accepted.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BrowserTaskSubmitResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/jobs/{id}": {
+      "get": {
+        "operationId": "getBrowserTaskJob",
+        "summary": "Poll a browser task job",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current job state. Terminal when status is completed, failed, or timed_out.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BrowserTaskJob" }
               }
             }
           }
